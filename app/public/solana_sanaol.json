@@ -3,12 +3,12 @@
   "name": "solana_sanaol",
   "instructions": [
     {
-      "name": "sendPost",
+      "name": "createUser",
       "accounts": [
         {
-          "name": "post",
+          "name": "user",
           "isMut": true,
-          "isSigner": true
+          "isSigner": false
         },
         {
           "name": "author",
@@ -23,6 +23,68 @@
       ],
       "args": [
         {
+          "name": "username",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "createPosts",
+      "accounts": [
+        {
+          "name": "posts",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "author",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "createPost",
+      "accounts": [
+        {
+          "name": "user",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "posts",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "post",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "author",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "timestamp",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
           "name": "title",
           "type": "string"
         },
@@ -31,17 +93,84 @@
           "type": "string"
         }
       ]
+    },
+    {
+      "name": "createPostLike",
+      "accounts": [
+        {
+          "name": "post",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "postLike",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "author",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "postId",
+          "type": "u64"
+        },
+        {
+          "name": "like",
+          "type": "bool"
+        }
+      ]
     }
   ],
   "accounts": [
     {
-      "name": "Post",
+      "name": "UserAccount",
       "type": {
         "kind": "struct",
         "fields": [
           {
             "name": "author",
             "type": "publicKey"
+          },
+          {
+            "name": "username",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PostsAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "postCount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PostAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "author",
+            "type": "publicKey"
+          },
+          {
+            "name": "authorUsername",
+            "type": "string"
           },
           {
             "name": "timestamp",
@@ -54,6 +183,30 @@
           {
             "name": "content",
             "type": "string"
+          },
+          {
+            "name": "likes",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PostLikeAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "author",
+            "type": "publicKey"
+          },
+          {
+            "name": "like",
+            "type": "bool"
+          },
+          {
+            "name": "postId",
+            "type": "u64"
           }
         ]
       }
@@ -69,6 +222,11 @@
       "code": 6001,
       "name": "ContentTooLong",
       "msg": "The provided content should be 280 characters long maximum."
+    },
+    {
+      "code": 6002,
+      "name": "UsernameTooLong",
+      "msg": "The provided username should be 20 characters long maximum."
     }
   ],
   "metadata": {
