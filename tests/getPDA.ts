@@ -12,21 +12,9 @@ export const getUserPDA = async (
   return userPDA;
 };
 
-export const getPostsPDA = async (program): Promise<anchor.web3.PublicKey> => {
-  const [postsPDA] = await anchor.web3.PublicKey.findProgramAddressSync(
-    [Buffer.from("posts", "utf-8")],
-    program.programId
-  );
-  return postsPDA;
-};
-
-export const getPostPDA = async (
-  program,
-  postId
-): Promise<anchor.web3.PublicKey> => {
-  const postsIdBuffer = new BN(postId).toBuffer("be", 8);
+export const getPostPDA = async (program): Promise<anchor.web3.PublicKey> => {
   const [postPDA] = await anchor.web3.PublicKey.findProgramAddressSync(
-    [Buffer.from("post", "utf-8"), postsIdBuffer],
+    [Buffer.from("post", "utf-8")],
     program.programId
   );
   return postPDA;

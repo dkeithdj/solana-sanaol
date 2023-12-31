@@ -3,7 +3,8 @@ import { BN, Program } from "@coral-xyz/anchor";
 import { SolanaSanaol } from "../target/types/solana_sanaol";
 
 import { assert } from "chai";
-import { getPostLikePDA, getPostPDA, getPostsPDA, getUserPDA } from "./getPDA";
+import { getPostLikePDA, getPostPDA, getUserPDA } from "./getPDA";
+import { SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
 
 describe("solana-sanaol", () => {
   // Configure the client to use the local cluster.
@@ -28,35 +29,32 @@ describe("solana-sanaol", () => {
     assert.equal(userAccount.author.toBase58(), publicKey.toBase58());
   });
 
-  it("creates a posts account", async () => {
-    const postsPDA = await getPostsPDA(program);
+  it("updates a user", async () => {
+    const userPDA = await getUserPDA(program, publicKey);
+    let userAccount = await program.account.userAccount.fetch(userPDA);
+    console.log("before: ", userAccount.username);
     await program.methods
-      .createPosts()
+      .updateUser("amimir2")
       .accounts({
-        posts: postsPDA,
+        user: userPDA,
         author: program.provider.publicKey,
         systemProgram: anchor.web3.SystemProgram.programId,
       })
       .rpc();
-    const postsAccount = await program.account.postsAccount.fetch(postsPDA);
-    assert.equal(postsAccount.postCount.toNumber(), 0);
+
+    userAccount = await program.account.userAccount.fetch(userPDA);
+    console.log("after: ", userAccount.username);
+    assert.equal(userAccount.username, "amimir2");
   });
 
   it("creates a post account", async () => {
     const userPDA = await getUserPDA(program, publicKey);
-    const postsPDA = await getPostsPDA(program);
-
-    let postsAccount = await program.account.postsAccount.fetch(postsPDA);
-    const postPDA = await getPostPDA(
-      program,
-      postsAccount.postCount.toNumber()
-    );
+    const postPDA = await getPostPDA(program);
 
     await program.methods
       .createPost("This is a title", "This is a content")
       .accounts({
         user: userPDA,
-        posts: postsPDA,
         post: postPDA,
         author: program.provider.publicKey,
         systemProgram: anchor.web3.SystemProgram.programId,
@@ -65,40 +63,63 @@ describe("solana-sanaol", () => {
       .rpc();
 
     const postAccount = await program.account.postAccount.fetch(postPDA);
-    postsAccount = await program.account.postsAccount.fetch(postsPDA);
     assert.equal(postAccount.author.toBase58(), publicKey.toBase58());
     assert.equal(postAccount.title, "This is a title");
     assert.equal(postAccount.content, "This is a content");
     assert.ok(postAccount.timestamp);
-    assert.equal(postsAccount.postCount.toNumber(), 1);
-    assert.equal(postAccount.authorUsername, "amimir");
   });
 
-  it("creates a post like account", async () => {
-    const postsPDA = await getPostsPDA(program);
-    let postsAccount = await program.account.postsAccount.fetch(postsPDA);
-
-    let postCount = postsAccount.postCount.toNumber() - 1;
-    const postPDA = await getPostPDA(program, postCount);
-    const postLikePDA = await getPostLikePDA(program, postCount, publicKey);
+  it("creates another post account", async () => {
+    const userPDA = await getUserPDA(program, publicKey);
+    const [postPDA] = await anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("post", "utf-8")],
+      program.programId
+    );
 
     await program.methods
-      .createPostLike(new anchor.BN(postCount), true)
+      .createPost("This is another title", "This is another content")
       .accounts({
+        user: userPDA,
         post: postPDA,
-        postLike: postLikePDA,
         author: program.provider.publicKey,
         systemProgram: anchor.web3.SystemProgram.programId,
+        timestamp: anchor.web3.SYSVAR_CLOCK_PUBKEY,
       })
       .rpc();
 
-    const postLikeAccount = await program.account.postLikeAccount.fetch(
-      postLikePDA
-    );
-    assert.equal(postLikeAccount.author.toBase58(), publicKey.toBase58());
-    assert.equal(postLikeAccount.like, true);
-    assert.equal(postLikeAccount.postId.toNumber(), postCount);
+    const postAccount = await program.account.postAccount.fetch(postPDA);
+    assert.equal(postAccount.author.toBase58(), publicKey.toBase58());
+    assert.equal(postAccount.title, "This is a title");
+    assert.equal(postAccount.content, "This is a content");
+    assert.ok(postAccount.timestamp);
   });
+
+  // it("creates a post like account", async () => {
+  //   const [postPDA] = await anchor.web3.PublicKey.findProgramAddressSync(
+  //     [Buffer.from("post", "utf-8")],
+  //     program.programId
+  //   );
+  // const [postLikePDA] = await anchor.web3.PublicKey.findProgramAddressSync(
+  //   [Buffer.from("post_like", "utf-8"), publicKey.toBuffer(), new anchor.BN()],
+  //   program.programId
+  // );
+
+  //   await program.methods
+  //     .createPostLike(new anchor.BN(postCount), true)
+  //     .accounts({
+  //       post: postPDA,
+  //       postLike: postLikePDA,
+  //       author: program.provider.publicKey,
+  //       systemProgram: anchor.web3.SystemProgram.programId,
+  //     })
+  //     .rpc();
+
+  //   const postLikeAccount = await program.account.postLikeAccount.fetch(
+  //     postLikePDA
+  //   );
+  //   assert.equal(postLikeAccount.author.toBase58(), publicKey.toBase58());
+  //   assert.equal(postLikeAccount.like, true);
+  // });
 
   // it("should be less than 20 characters of username", async () => {
   //   try {
