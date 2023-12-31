@@ -9,7 +9,7 @@ const Nav = () => {
     { ssr: false }
   );
   return (
-    <div className="flex justify-between items-center bg-purple-200 px-24 py-4">
+    <div className="flex justify-between items-center bg-purple-950 px-24 py-4">
       <div>Sanaol</div>
       <div>
         <ReactWalletMultiButton />
