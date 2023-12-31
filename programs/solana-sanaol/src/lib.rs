@@ -32,16 +32,19 @@ pub mod solana_sanaol {
         Ok(())
     }
 
-    pub fn create_posts(ctx: Context<CreatePosts>) -> Result<()> {
-        let posts = &mut ctx.accounts.posts;
-        posts.post_count = 0;
+    pub fn update_user(ctx: Context<UpdateUser>, username: String) -> Result<()> {
+        let user = &mut ctx.accounts.user;
+
+        if username.chars().count() > 20 {
+            return Err(ErrorCode::UsernameTooLong.into());
+        }
+
+        user.username = username;
 
         Ok(())
     }
 
     pub fn create_post(ctx: Context<CreatePost>, title: String, content: String) -> Result<()> {
-        let posts = &mut ctx.accounts.posts;
-
         let user = &mut ctx.accounts.user;
         let post = &mut ctx.accounts.post;
 
@@ -52,8 +55,6 @@ pub mod solana_sanaol {
         if content.chars().count() > 280 {
             return Err(ErrorCode::ContentTooLong.into());
         }
-
-        posts.post_count += 1;
 
         post.author = ctx.accounts.author.key();
         post.title = title;
@@ -97,13 +98,13 @@ pub struct CreateUser<'info> {
 }
 
 #[derive(Accounts)]
-pub struct CreatePosts<'info> {
+pub struct UpdateUser<'info> {
     #[account(
-        init,
-        seeds = [b"posts".as_ref()],
+        mut,
+        seeds = [b"user".as_ref(), author.key().as_ref()],
         bump,
-        payer = author, space = size_of::<PostsAccount>() + 8)]
-    pub posts: Account<'info, PostsAccount>,
+        )]
+    pub user: Account<'info, UserAccount>,
     #[account(mut)]
     pub author: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -119,15 +120,8 @@ pub struct CreatePost<'info> {
     pub user: Account<'info, UserAccount>,
 
     #[account(
-        mut,
-        seeds = [b"posts".as_ref()],
-        bump
-        )]
-    pub posts: Account<'info, PostsAccount>,
-
-    #[account(
         init,
-        seeds = [b"post".as_ref(), posts.post_count.to_be_bytes().as_ref()],
+        seeds = [b"post".as_ref(), author.key().as_ref()],
         bump,
         payer = author, space = PostAccount::LEN)]
     pub post: Account<'info, PostAccount>,
@@ -138,18 +132,17 @@ pub struct CreatePost<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(post_id: u64)]
 pub struct CreatePostLike<'info> {
     #[account(
         mut,
-        seeds = [b"post".as_ref(), post_id.to_be_bytes().as_ref()],
+        seeds = [b"post".as_ref()],
         bump
         )]
     pub post: Account<'info, PostAccount>,
 
     #[account(
         init,
-        seeds = [b"post_like".as_ref(),author.key().as_ref(), post_id.to_be_bytes().as_ref()],
+        seeds = [b"post_like".as_ref(),author.key().as_ref(), post.key().as_ref()],
         bump,
         payer = author, space = size_of::<PostLikeAccount>() + 8)]
     pub post_like: Account<'info, PostLikeAccount>,
@@ -162,11 +155,6 @@ pub struct CreatePostLike<'info> {
 pub struct UserAccount {
     pub author: Pubkey,
     pub username: String,
-}
-
-#[account]
-pub struct PostsAccount {
-    pub post_count: u64,
 }
 
 #[account]
