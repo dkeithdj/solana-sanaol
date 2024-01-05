@@ -90,7 +90,7 @@ pub struct CreateUser<'info> {
         init,
         seeds = [b"user".as_ref(), author.key().as_ref()],
         bump,
-        payer = author, space = UserAccount::LEN)]
+        payer = author, space = 8 + size_of::<UserAccount>() + MAX_USERNAME_LENGTH)]
     pub user: Account<'info, UserAccount>,
     #[account(mut)]
     pub author: Signer<'info>,
@@ -123,7 +123,7 @@ pub struct CreatePost<'info> {
         init,
         seeds = [b"post".as_ref(), author.key().as_ref()],
         bump,
-        payer = author, space = PostAccount::LEN)]
+        payer = author, space = 8 + size_of::<PostAccount>() + MAX_TITLE_LENGTH + MAX_CONTENT_LENGTH)]
     pub post: Account<'info, PostAccount>,
     #[account(mut)]
     pub author: Signer<'info>,
@@ -155,12 +155,14 @@ pub struct CreatePostLike<'info> {
 pub struct UserAccount {
     pub author: Pubkey,
     pub username: String,
+    pub post_count: u64,
 }
 
 #[account]
 pub struct PostAccount {
     pub author: Pubkey,
     pub author_username: String,
+    pub post_id: u64,
     pub timestamp: i64,
     pub title: String,
     pub content: String,
@@ -172,19 +174,4 @@ pub struct PostLikeAccount {
     pub author: Pubkey,
     pub like: bool,
     pub post_id: u64,
-}
-
-impl UserAccount {
-    const LEN: usize = DISCRIMINATOR_LENGTH
-        + PUBLIC_KEY_LENGTH // Author.
-        + STRING_LENGTH_PREFIX + MAX_USERNAME_LENGTH; // Username.
-}
-
-impl PostAccount {
-    const LEN: usize = DISCRIMINATOR_LENGTH
-        + PUBLIC_KEY_LENGTH // Author.
-        + TIMESTAMP_LENGTH // Timestamp.
-        + STRING_LENGTH_PREFIX + MAX_TITLE_LENGTH // Topic.
-        + STRING_LENGTH_PREFIX + MAX_CONTENT_LENGTH // Content.
-        + LIKE_LENGTH; // Likes.
 }
