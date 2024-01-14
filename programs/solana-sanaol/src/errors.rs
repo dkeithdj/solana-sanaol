@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 #[error_code]
-pub enum ErrorCode {
+pub enum ErrorCodes {
     #[msg("The provided title should be 50 characters long maximum.")]
     TitleTooLong,
     #[msg("The provided content should be 280 characters long maximum.")]

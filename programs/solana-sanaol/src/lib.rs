@@ -1,177 +1,142 @@
 use std::mem::size_of;
 
+pub mod constants;
+pub mod errors;
+pub mod structs;
+use crate::{constants::*, errors::*, structs::*};
+
 use anchor_lang::prelude::*;
 
-pub mod error;
-use crate::error::ErrorCode;
 declare_id!("DuR2A1djtv4vvRgGC9uqntpFo1LQEEUduayDQjXM7qqY");
-
-const DISCRIMINATOR_LENGTH: usize = 8;
-const PUBLIC_KEY_LENGTH: usize = 32;
-const TIMESTAMP_LENGTH: usize = 8;
-const LIKE_LENGTH: usize = 8;
-const STRING_LENGTH_PREFIX: usize = 4; // Stores the size of the string.
-const MAX_TITLE_LENGTH: usize = 50 * 4; // 50 chars max.
-const MAX_CONTENT_LENGTH: usize = 280 * 4; // 280 chars max.
-const MAX_USERNAME_LENGTH: usize = 20 * 4; // 20 chars max.
 
 #[program]
 pub mod solana_sanaol {
     use super::*;
 
-    pub fn create_user(ctx: Context<CreateUser>, username: String) -> Result<()> {
+    pub fn create_user(ctx: Context<CreateUser>) -> Result<()> {
         let user = &mut ctx.accounts.user;
-
-        if username.chars().count() > 20 {
-            return Err(ErrorCode::UsernameTooLong.into());
-        }
-
         user.author = ctx.accounts.author.key();
-        user.username = username;
+        user.post_count = 0;
+        user.last_post = 0;
 
-        Ok(())
-    }
-
-    pub fn update_user(ctx: Context<UpdateUser>, username: String) -> Result<()> {
-        let user = &mut ctx.accounts.user;
-
-        if username.chars().count() > 20 {
-            return Err(ErrorCode::UsernameTooLong.into());
-        }
-
-        user.username = username;
+        msg!("Created user: {}", user.author);
 
         Ok(())
     }
 
     pub fn create_post(ctx: Context<CreatePost>, title: String, content: String) -> Result<()> {
-        let user = &mut ctx.accounts.user;
-        let post = &mut ctx.accounts.post;
+        let user_account = &mut ctx.accounts.user;
+        let post_account = &mut ctx.accounts.post;
 
-        if title.chars().count() > 50 {
-            return Err(ErrorCode::TitleTooLong.into());
-        }
+        require!(!title.len() > 50, ErrorCodes::TitleTooLong);
+        require!(content.len() > 256, ErrorCodes::ContentTooLong);
 
-        if content.chars().count() > 280 {
-            return Err(ErrorCode::ContentTooLong.into());
-        }
+        post_account.author = ctx.accounts.author.key();
+        post_account.post_id = user_account.last_post;
+        post_account.title = title;
+        post_account.content = content;
+        post_account.timestamp = ctx.accounts.timestamp.unix_timestamp;
 
-        post.author = ctx.accounts.author.key();
-        post.title = title;
-        post.content = content;
-        post.timestamp = ctx.accounts.timestamp.unix_timestamp;
-        post.author_username = user.username.clone();
-        post.likes = 0;
+        user_account.last_post = user_account.last_post.checked_add(1).unwrap();
+        user_account.post_count = user_account.last_post.checked_add(1).unwrap();
 
-        Ok(())
-    }
+        msg!(
+            "Created post: '{}' by {}",
+            post_account.title,
+            user_account.author
+        );
 
-    pub fn create_post_like(ctx: Context<CreatePostLike>, post_id: u64, like: bool) -> Result<()> {
-        let post = &mut ctx.accounts.post;
-        let post_like = &mut ctx.accounts.post_like;
-
-        post_like.author = ctx.accounts.author.key();
-        post_like.like = like;
-        post_like.post_id = post_id;
-
-        if like {
-            post.likes += 1;
-        } else {
-            post.likes -= 1;
-        }
+        msg!("User post count: {}", user_account.post_count);
 
         Ok(())
     }
 }
 
 #[derive(Accounts)]
+#[instruction()]
 pub struct CreateUser<'info> {
     #[account(
         init,
-        seeds = [b"user".as_ref(), author.key().as_ref()],
+        seeds = [USER, author.key().as_ref()],
         bump,
-        payer = author, space = 8 + size_of::<UserAccount>() + MAX_USERNAME_LENGTH)]
-    pub user: Account<'info, UserAccount>,
+        payer = author,
+        space = 8 + size_of::<UserAccount>()
+    )]
+    pub user: Box<Account<'info, UserAccount>>,
     #[account(mut)]
     pub author: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
-pub struct UpdateUser<'info> {
-    #[account(
-        mut,
-        seeds = [b"user".as_ref(), author.key().as_ref()],
-        bump,
-        )]
-    pub user: Account<'info, UserAccount>,
-    #[account(mut)]
-    pub author: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
+#[instruction()]
 pub struct CreatePost<'info> {
     #[account(
         mut,
-        seeds = [b"user".as_ref(), author.key().as_ref()],
+        seeds = [USER, author.key().as_ref()],
         bump
-        )]
+    )]
     pub user: Account<'info, UserAccount>,
 
     #[account(
         init,
-        seeds = [b"post".as_ref(), author.key().as_ref()],
+        seeds = [POST, author.key().as_ref(), &[user.last_post as u8].as_ref()],
         bump,
-        payer = author, space = 8 + size_of::<PostAccount>() + MAX_TITLE_LENGTH + MAX_CONTENT_LENGTH)]
-    pub post: Account<'info, PostAccount>,
+        payer = author, space = 8 + size_of::<PostAccount>()
+    )]
+    pub post: Box<Account<'info, PostAccount>>,
     #[account(mut)]
     pub author: Signer<'info>,
-    pub system_program: Program<'info, System>,
     pub timestamp: Sysvar<'info, Clock>,
-}
-
-#[derive(Accounts)]
-pub struct CreatePostLike<'info> {
-    #[account(
-        mut,
-        seeds = [b"post".as_ref()],
-        bump
-        )]
-    pub post: Account<'info, PostAccount>,
-
-    #[account(
-        init,
-        seeds = [b"post_like".as_ref(),author.key().as_ref(), post.key().as_ref()],
-        bump,
-        payer = author, space = size_of::<PostLikeAccount>() + 8)]
-    pub post_like: Account<'info, PostLikeAccount>,
-    #[account(mut)]
-    pub author: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
 
-#[account]
-pub struct UserAccount {
-    pub author: Pubkey,
-    pub username: String,
-    pub post_count: u64,
+pub fn bump(seeds: &[&[u8]], program_id: &Pubkey) -> u8 {
+    let (_found_key, bump) = Pubkey::find_program_address(seeds, program_id);
+    bump
 }
 
-#[account]
-pub struct PostAccount {
-    pub author: Pubkey,
-    pub author_username: String,
-    pub post_id: u64,
-    pub timestamp: i64,
-    pub title: String,
-    pub content: String,
-    pub likes: i64,
-}
+// #[derive(Accounts)]
+// pub struct CreatePostLike<'info> {
+//     #[account(
+//         mut,
+//         seeds = [b"post".as_ref()],
+//         bump
+//         )]
+//     pub post: Account<'info, PostAccount>,
 
-#[account]
-pub struct PostLikeAccount {
-    pub author: Pubkey,
-    pub like: bool,
-    pub post_id: u64,
-}
+//     #[account(
+//         init,
+//         seeds = [b"post_like".as_ref(),author.key().as_ref(), post.key().as_ref()],
+//         bump,
+//         payer = author, space = size_of::<PostLikeAccount>() + 8)]
+//     pub post_like: Account<'info, PostLikeAccount>,
+//     #[account(mut)]
+//     pub author: Signer<'info>,
+//     pub system_program: Program<'info, System>,
+// }
+
+// #[account]
+// pub struct UserAccount {
+//     pub author: Pubkey,
+//     pub username: String,
+//     pub post_count: u64,
+// }
+
+// #[account]
+// pub struct PostAccount {
+//     pub author: Pubkey,
+//     pub author_username: String,
+//     pub post_id: u64,
+//     pub timestamp: i64,
+//     pub title: String,
+//     pub content: String,
+//     pub likes: i64,
+// }
+
+// #[account]
+// pub struct PostLikeAccount {
+//     pub author: Pubkey,
+//     pub like: bool,
+//     pub post_id: u64,
+// }
